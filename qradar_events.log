@@ -3,3 +3,13 @@
 2025-11-11 21:08:03,246 - QRadarLogger - WARNING - Could not connect to QRadar: [Errno 8] nodename nor servname provided, or not known
 2025-11-11 21:08:20,076 - QRadarLogger - ERROR - Failed to send event to QRadar: [Errno 8] nodename nor servname provided, or not known
 2025-11-11 21:08:44,221 - QRadarLogger - ERROR - Failed to send event to QRadar: [Errno 8] nodename nor servname provided, or not known
+2025-11-11 21:20:15,589 - QRadarLogger - WARNING - Could not connect to QRadar: [Errno 8] nodename nor servname provided, or not known
+2025-11-11 21:20:15,900 - QRadarLogger - WARNING - Could not connect to QRadar: [Errno 8] nodename nor servname provided, or not known
+2025-11-11 21:27:07,185 - QRadarLogger - WARNING - Could not connect to QRadar: [Errno 8] nodename nor servname provided, or not known
+2025-11-11 21:27:07,683 - QRadarLogger - ERROR - Failed to send event to QRadar: [Errno 8] nodename nor servname provided, or not known
+2025-11-11 21:27:57,840 - QRadarLogger - WARNING - Could not connect to QRadar: [Errno 8] nodename nor servname provided, or not known
+2025-11-11 21:28:21,237 - QRadarLogger - WARNING - Could not connect to QRadar: [Errno 8] nodename nor servname provided, or not known
+2025-11-11 21:28:21,499 - QRadarLogger - ERROR - Failed to send event to QRadar: [Errno 8] nodename nor servname provided, or not known
+2025-11-11 21:29:07,804 - QRadarLogger - WARNING - Could not connect to QRadar: [Errno 8] nodename nor servname provided, or not known
+2025-11-11 21:29:08,291 - QRadarLogger - ERROR - Failed to send event to QRadar: [Errno 8] nodename nor servname provided, or not known
+2025-11-11 21:29:59,920 - QRadarLogger - WARNING - Could not connect to QRadar: [Errno 8] nodename nor servname provided, or not known
