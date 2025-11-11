@@ -1,31 +1,30 @@
+"""
+Authentication module - handles user authentication, token creation/validation, and password hashing.
+Framework-agnostic: uses only jose, bcrypt, and sqlalchemy (no FastAPI).
+"""
 from datetime import datetime, timedelta
 from typing import Optional, Union
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
-from passlib.context import CryptContext
+import bcrypt
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 import os
 from dotenv import load_dotenv
-from .db import get_db
 from .models import User
 from .qradar_logger import qradar_logger
 
 load_dotenv()
 
 # Security configuration
-SECRET_KEY = os.getenv("SECRET_KEY")
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-in-production")
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_DURATION = timedelta(minutes=15)
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
+# Pydantic models for request/response
 class Token(BaseModel):
     access_token: str
     refresh_token: str
@@ -33,7 +32,7 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
-    scopes: list[str] = []
+    scopes: list = []
 
 class UserCreate(BaseModel):
     username: str
@@ -41,13 +40,25 @@ class UserCreate(BaseModel):
     password: str
     full_name: Optional[str] = None
 
+# Password utilities - use bcrypt directly
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verify plain password against hashed password using bcrypt"""
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode('utf-8'),
+            hashed_password.encode('utf-8')
+        )
+    except Exception:
+        return False
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    """Hash a plain password using bcrypt"""
+    salt = bcrypt.gensalt(rounds=12)
+    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
-def create_tokens(data: dict, expires_delta: Optional[timedelta] = None) -> tuple[str, str]:
+# Token utilities
+def create_tokens(data: dict, expires_delta: Optional[timedelta] = None) -> tuple:
+    """Create access and refresh JWT tokens"""
     to_encode = data.copy()
     
     # Access token
@@ -62,7 +73,17 @@ def create_tokens(data: dict, expires_delta: Optional[timedelta] = None) -> tupl
     
     return access_token, refresh_token
 
-async def authenticate_user(db: Session, username: str, password: str, ip_address: str) -> Union[User, bool]:
+def decode_token(token: str) -> Optional[dict]:
+    """Decode JWT token and return payload or None if invalid"""
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+
+# Authentication
+def authenticate_user(db: Session, username: str, password: str, ip_address: str) -> Union[User, bool]:
+    """Authenticate user with username/password; returns User or False"""
     user = db.query(User).filter(User.username == username).first()
     
     if not user:
@@ -100,34 +121,17 @@ async def authenticate_user(db: Session, username: str, password: str, ip_addres
     qradar_logger.log_login_attempt(username, ip_address, True)
     return user
 
-async def get_current_user(
-    db: Session = Depends(get_db),
-    token: str = Depends(oauth2_scheme)
-) -> User:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
-    try:
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        token_data = TokenData(username=username)
-    except JWTError:
-        raise credentials_exception
-    
-    user = db.query(User).filter(User.username == token_data.username).first()
-    if user is None:
-        raise credentials_exception
-    
+def get_current_user(db: Session, token: str) -> Optional[User]:
+    """Get user from token; returns User or None if invalid"""
+    payload = decode_token(token)
+    if not payload:
+        return None
+    username = payload.get("sub")
+    if not username:
+        return None
+    user = db.query(User).filter(User.username == username).first()
     return user
 
-def require_admin(user: User = Depends(get_current_user)):
-    if user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Operation requires admin privileges"
-        )
+def is_admin(user: User) -> bool:
+    """Check if user has admin role"""
+    return user and user.role == "admin"

@@ -1,0 +1,5 @@
+2025-11-11 21:06:59,366 - QRadarLogger - WARNING - Could not connect to QRadar: [Errno 8] nodename nor servname provided, or not known
+2025-11-11 21:07:17,867 - QRadarLogger - WARNING - Could not connect to QRadar: [Errno 8] nodename nor servname provided, or not known
+2025-11-11 21:08:03,246 - QRadarLogger - WARNING - Could not connect to QRadar: [Errno 8] nodename nor servname provided, or not known
+2025-11-11 21:08:20,076 - QRadarLogger - ERROR - Failed to send event to QRadar: [Errno 8] nodename nor servname provided, or not known
+2025-11-11 21:08:44,221 - QRadarLogger - ERROR - Failed to send event to QRadar: [Errno 8] nodename nor servname provided, or not known

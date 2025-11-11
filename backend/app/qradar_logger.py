@@ -1,3 +1,7 @@
+"""
+QRadar Logger - forwards security events to QRadar via syslog or HTTP.
+Handles login attempts, admin access, and suspicious activities.
+"""
 import logging
 import socket
 import json
@@ -15,30 +19,43 @@ class QRadarLogger:
         self.protocol = os.getenv('QRADAR_PROTOCOL', 'TCP').upper()
         self.logger = self._setup_logger()
         self.sock = None
-        if self.protocol == 'TCP':
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock.connect((self.host, self.port))
+        
+        # Only try to connect if QRADAR_HOST is set
+        if self.host and self.protocol == 'TCP':
+            try:
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.sock.connect((self.host, self.port))
+            except Exception as e:
+                self.logger.warning(f"Could not connect to QRadar: {e}")
+                self.sock = None
     
     def _setup_logger(self):
         logger = logging.getLogger('QRadarLogger')
         logger.setLevel(logging.INFO)
         
-        # File handler for local logging
-        fh = logging.FileHandler('qradar_events.log')
-        fh.setLevel(logging.INFO)
+        # Try to create file handler; skip if permission denied
+        try:
+            log_dir = os.path.dirname(os.path.abspath('qradar_events.log'))
+            os.makedirs(log_dir, exist_ok=True)
+            fh = logging.FileHandler('qradar_events.log')
+            fh.setLevel(logging.INFO)
+            formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+            fh.setFormatter(formatter)
+            logger.addHandler(fh)
+        except PermissionError:
+            pass  # Skip file logging if permission denied
+        except Exception as e:
+            pass  # Skip file logging if any error
         
-        # Console handler
+        # Console handler (always works)
         ch = logging.StreamHandler()
         ch.setLevel(logging.INFO)
-        
-        # Formatter
         formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
-        fh.setFormatter(formatter)
         ch.setFormatter(formatter)
-        
-        logger.addHandler(fh)
         logger.addHandler(ch)
         
         return logger
@@ -59,14 +76,15 @@ class QRadarLogger:
         try:
             message = self._format_syslog_message(event_type, details)
             
-            if self.protocol == 'TCP':
+            if self.host and self.sock:
                 self.sock.send(f"{message}\n".encode('utf-8'))
-            else:  # UDP
-                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                sock.sendto(message.encode('utf-8'), (self.host, self.port))
-                sock.close()
+            else:  # UDP or no host configured
+                if self.host:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    sock.sendto(message.encode('utf-8'), (self.host, self.port))
+                    sock.close()
             
-            self.logger.info(f"Event sent to QRadar: {message}")
+            self.logger.info(f"Event sent to QRadar: {event_type}")
             return True
             
         except Exception as e:
@@ -112,7 +130,7 @@ class QRadarLogger:
     
     def __del__(self):
         """Cleanup socket connection"""
-        if self.sock:
+        if hasattr(self, 'sock') and self.sock:
             try:
                 self.sock.close()
             except:
